@@ -1,0 +1,318 @@
+% chapter1-body.tex — pure content, no preamble.
+% This file is \input{} by both main.tex (book) and chapter1.tex (article).
+
+
+
+
+\section{Problem Comprehend}
+Consider a one-dimensional line with a wall located at
+\[
+    x=a>0.
+\]
+We launch a right-going wave from the left. Its complex representation is
+\[
+    U(x,t)=e^{ikx}e^{-i\omega t}
+    =e^{i(kx-\omega t)}.
+\]
+
+Here, $\omega$ is the angular frequency, with unit $\mathrm{s}^{-1}$,
+and $k$ is the wavenumber, with unit $\mathrm{m}^{-1}$.
+The spatial phase is
+\[
+    \phi(x)=kx.
+\]
+
+For a uniform wave, one complete wavelength $\lambda$ corresponds to
+a phase change of $2\pi$. Hence
+\[
+    k=\frac{2\pi}{\lambda}.
+\]
+
+This definition uses a complete wavelength. However, if the phase varies
+spatially, a complete wavelength may not be locally available for
+measurement. Instead, we consider the phase change over an infinitesimal
+spatial interval:
+\[
+    k(x)
+    =\lim_{\Delta x\to0}
+    \frac{\phi(x+\Delta x)-\phi(x)}{\Delta x}
+    =\frac{d\phi}{dx}.
+\]
+
+Thus, the local wavenumber measures the local phase accumulation per
+unit distance.
+
+The same idea can also be interpreted through time.
+Dividing the local phase change and the propagation distance
+by the same time interval gives, intuitively,
+\[
+    k
+    =\frac{d\phi}{dx}
+    \sim
+    \frac{d\phi/dt}{dx/dt}
+    =\frac{\omega}{c}.
+\]
+Thus, the wavenumber can also be understood as the temporal phase
+accumulation rate divided by the propagation speed.
+
+% TODO (Work 2): give a rigorous derivation using the total derivative
+% along a constant-phase trajectory.
+
+In higher dimensions, this idea becomes the local wavevector
+\[
+    \mathbf{k}(x)=\nabla\phi(x).
+\]
+
+
+\subsection{Propagation Directions in One Dimension}
+In one dimension, the unit sphere consists of only two points,
+\[
+    S^0=\{-1,+1\},
+\]
+corresponding to the two possible propagation directions.
+
+If
+\[
+    D^1=[-1,1],
+\]
+then
+\[
+    \partial D^1=S^0=\{-1,+1\}.
+\]
+
+For a direction $d\in S^0$, a plane-wave solution can be written as
+\[
+    u(x;d)=e^{ikxd}.
+\]
+Therefore,
+\[
+    d=+1 \quad\Longrightarrow\quad e^{ikx},
+\]
+and
+\[
+    d=-1 \quad\Longrightarrow\quad e^{-ikx}.
+\]
+
+% TODO: explain how the discrete directions in $S^0$
+% generalize to $d\in S^{n-1}$ in higher dimensions.
+
+
+
+
+\section{TMP}
+
+
+\subsection{MVHR}
+\[
+    T^i{}_{ab}=
+    \left[\begin{array}{c}
+            \left[\begin{array}{ccc}
+                          \left[\begin{array}{NNNN}
+                                  1 &
+                                  2 &
+                                  3 &
+                                  4
+                              \end{array}\right]_{b}
+                           &
+                          \left[\begin{array}{NNNN}
+                                  5 &
+                                  6 &
+                                  7 &
+                                  8
+                              \end{array}\right]_{b}
+                           &
+                          \left[\begin{array}{NNNN}
+                                  9  &
+                                  10 &
+                                  11 &
+                                  12
+                              \end{array}\right]_{b}
+                      \end{array}\right]_{a}
+            \\
+            \left[\begin{array}{ccc}
+                          \left[\begin{array}{NNNN}
+                                  13 &
+                                  14 &
+                                  15 &
+                                  16
+                              \end{array}\right]_{b}
+                           &
+                          \left[\begin{array}{NNNN}
+                                  17 &
+                                  18 &
+                                  19 &
+                                  20
+                              \end{array}\right]_{b}
+                           &
+                          \left[\begin{array}{NNNN}
+                                  21 &
+                                  22 &
+                                  23 &
+                                  24
+                              \end{array}\right]_{b}
+                      \end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+\[
+    T_i{}^a{}_b=
+    \left[\begin{array}{cc}
+            \left[\begin{array}{ccc}
+                          \left[\begin{array}{NNNN}
+                                  1 &
+                                  2 &
+                                  3 &
+                                  4
+                              \end{array}\right]_{b}
+                          \\
+                          \left[\begin{array}{NNNN}
+                                  5 &
+                                  6 &
+                                  7 &
+                                  8
+                              \end{array}\right]_{b}
+                          \\
+                          \left[\begin{array}{NNNN}
+                                  9  &
+                                  10 &
+                                  11 &
+                                  12
+                              \end{array}\right]_{b}
+                      \end{array}\right]_{a}
+             &
+            \left[\begin{array}{ccc}
+                          \left[\begin{array}{NNNN}
+                                  13 &
+                                  14 &
+                                  15 &
+                                  16
+                              \end{array}\right]_{b}
+                          \\
+                          \left[\begin{array}{NNNN}
+                                  17 &
+                                  18 &
+                                  19 &
+                                  20
+                              \end{array}\right]_{b}
+                          \\
+                          \left[\begin{array}{NNNN}
+                                  21 &
+                                  22 &
+                                  23 &
+                                  24
+                              \end{array}\right]_{b}
+                      \end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+\[
+    s=\left[\begin{array}{c}7\end{array}\right]_{0}
+\]
+\[
+    A^i=\left[\begin{array}{c}
+            7
+            \\
+            3
+        \end{array}\right]_{i}
+\]
+\[
+    A_i=\left[\begin{array}{cc}7&3\end{array}\right]_{i}
+\]
+\[
+    B^i{}_a=\left[\begin{array}{cc}
+            \left[\begin{array}{lll}1&2&3\end{array}\right]_{a}
+            \\
+            \left[\begin{array}{lll}4&5&6\end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+\[
+    B_i{}^a=\left[\begin{array}{cc}
+            \left[\begin{array}{lll}
+                          1
+                          \\
+                          2
+                          \\
+                          3\end{array}\right]_{a}
+             &
+            \left[\begin{array}{lll}
+                          1
+                          \\
+                          2
+                          \\
+                          3\end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+\[
+    B^{ia}=\left[\begin{array}{cc}
+            \left[\begin{array}{lll}
+                          1
+                          \\
+                          2
+                          \\
+                          3\end{array}\right]_{a}
+            \\
+            \left[\begin{array}{lll}
+                          1
+                          \\
+                          2
+                          \\
+                          3\end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+\[
+    B_{ia}=\left[\begin{array}{cc}
+            \left[\begin{array}{lll}
+                          1 &
+                          2 &
+                          3
+                      \end{array}\right]_{a}
+             &
+            \left[\begin{array}{lll}
+                          1 &
+                          2 &
+                          3
+                      \end{array}\right]_{a}
+        \end{array}\right]_{i}
+\]
+TMP
+
+
+
+
+\section{Reference}
+\bibliographystyle{plain}  % or another style like unsrt, IEEEtran, etc.
+\bibliography{refer}  % references.bib is the file name
+
+
+% \subsection{Definition of EMH}
+% \begin{definition}[EMH means Symmetries]
+%     \label{def:mydefinition}
+%     We say a market is completely EMH if and
+%     only if for every condition $A$, the random
+%     variable of the logarithmic growth rate $W$
+%     agrees that $\mathbb{E}_{W\mid A}(W)\doteq 0$.
+% \end{definition}
+
+
+% \subsection{Prior Work}
+% Discussion of what others have done.
+
+
+
+
+% \section{Methods}
+% How you approached the problem.
+
+
+
+
+% \section{Results}
+% What you found.
+
+
+
+
+% \section{Conclusion}
+% Your closing thoughts.
+
+
+
+

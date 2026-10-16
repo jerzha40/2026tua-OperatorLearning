@@ -1,0 +1,681 @@
+% Chapter 4 — ResOpNet. Pure chapter content: no documentclass or preamble.
+% Research proposal and mathematical specification, not a report of completed experiments.
+% The same file is intended for the standalone article and the DHNTeam book.
+
+\section{ResOpNet: Motivation and Research Objective}
+\label{sec:resop-motivation}
+
+Numerical integration can be viewed as two tasks: evaluating a simple discrete
+sum and accounting for the signed area missed by that sum. The first task is
+already solved efficiently by classical quadrature. The second is the object of
+this chapter.
+
+The proposed \emph{Residual Operator Network} (ResOpNet) separates these tasks:
+\begin{equation}
+    \boxed{\widehat{\mathcal I}_{\theta,Q}(f)
+        = Q(f)+R_{\theta,Q}(S(f)).}
+    \label{eq:resop-principle}
+\end{equation}
+Here $\mathcal I$ is the desired integration operator, $Q$ is an explicitly
+chosen baseline quadrature operator, $S$ supplies observations of the input
+function, and $R_{\theta,Q}$ predicts the signed difference between the true
+integral and the baseline result.
+
+The analogy with residual networks is architectural. Rather than asking a
+network to relearn an inexpensive, known operation, we preserve that operation
+as a separate path and train only its correction. ResNet uses an identity
+shortcut; here the shortcut is a \emph{numerical operator}. The additive
+decomposition by itself is not a claim of algorithmic novelty or improved
+accuracy: the useful question is whether the learned correction exploits
+information about a restricted family of functions that a general-purpose
+quadrature method does not use.
+
+Our primary practical objective is:
+\begin{quote}
+    At the same verified integration accuracy, reduce the number of expensive
+    function evaluations and/or the total execution time relative to strong
+    classical quadrature baselines.
+\end{quote}
+A second objective is to define reusable interfaces for function families,
+local residual operators, sampling policies, and fair numerical benchmarks.
+A larger research community or registry is an aspiration, not a result
+established by this chapter.
+
+\subsection{What is and is not being learned}
+
+A composite rectangle or trapezoid sum is inexpensive once its samples are
+available. We therefore distinguish \emph{cell-boundary samples}, used by the
+classical quadrature path, from \emph{cell-interior samples}, given to the
+learning path. The learning path may inspect many interior observations. There
+is no requirement that it receive only a few values, or that every cell have
+the same physical width.
+
+In the minimal prototype, the baseline quadrature is fixed and exact as a
+computation on its samples. An optional later mode replaces a costly baseline
+operator by its own learned approximation.
+% 这句话是不是不太需要
+That optional mode is conceptually
+separate from the first experiment; mimicking a cheap weighted sum with an MLP
+is not in itself a speed optimization.
+
+\section{Local Cells and the Reference Interval}
+\label{sec:resop-reference}
+
+Let $f:[a,b]\to\mathbb R$ and choose a mesh
+\[
+    a=x_0<x_1<\cdots<x_N=b,\qquad h_i=x_{i+1}-x_i>0.
+\]
+The exact contribution of the $i$th cell is
+\[
+    I_i(f)=\int_{x_i}^{x_{i+1}}f(x)\,dx.
+\]
+Every physical cell is pulled back to the same reference interval:
+\begin{equation}
+    A_i:[0,1]\longrightarrow[x_i,x_{i+1}],
+    \quad t\longmapsto x_i+h_it,
+    \qquad g_i(t):=f(A_i(t)).
+    \label{eq:resop-affine}
+\end{equation}
+The change of variables gives the exact identity
+\begin{equation}
+    \boxed{I_i(f)=h_i\int_0^1 g_i(t)\,dt.}
+    \label{eq:resop-cell-integral}
+\end{equation}
+Thus a single operator on $[0,1]$ can be reused for every cell. The factor
+$h_i$ is restored only after evaluating the reference-cell operator.
+Affine normalization fixes the domain, but it does \emph{not} make all
+pulled-back functions statistically alike: frequencies, derivatives, and
+singular features change as $h_i$ varies.
+
+\subsection{Two sampling systems, with different responsibilities}
+\label{sec:resop-two-samplings}
+
+For clarity, use the composite trapezoid path first. It consumes the cell
+endpoints
+\begin{equation}
+    E_i(f)=\bigl(f(x_i),f(x_{i+1})\bigr)
+    =\bigl(g_i(0),g_i(1)\bigr).
+\end{equation}
+Choose interior reference locations
+\[
+    0<\tau_1<\cdots<\tau_m<1.
+\]
+The residual network consumes a separate interior observation vector
+\begin{equation}
+    S^{\mathrm{int}}_m(g_i)
+    =\bigl(g_i(\tau_1),\ldots,g_i(\tau_m)\bigr)
+    =\bigl(f(x_i+h_i\tau_j)\bigr)_{j=1}^{m}.
+    \label{eq:resop-interior-sampling}
+\end{equation}
+These additional samples may be regular, nonuniform, multiscale, or selected
+adaptively. The endpoint observations may also be supplied to the network
+for detrending. The distinction concerns \emph{their computational role}, not
+a rule that information must never be shared.
+
+For the reference function $g$, define the normalized trapezoid operator
+\begin{equation}
+    Q_{\mathrm T}(g)=\frac{g(0)+g(1)}{2}.
+    \label{eq:resop-trapezoid}
+\end{equation}
+The physical cell's classic contribution is $h_iQ_{\mathrm T}(g_i)$.
+Other baselines, including rectangle, midpoint, Simpson, or Gaussian
+quadrature, can later be specified by their nodes and weights on $[0,1]$.
+When a baseline requires interior nodes, those evaluations are counted
+explicitly in the comparison.
+
+\section{The Exact Residual Operator}
+\label{sec:resop-exact}
+
+For a fixed reference quadrature rule $Q$, define the signed local residual
+\begin{equation}
+    \boxed{
+        \mathcal R_Q(g)
+        :=\int_0^1g(t)\,dt-Q(g).
+    }
+    \label{eq:resop-exact-residual}
+\end{equation}
+This is a map from an appropriate function space to $\mathbb R$; it is not
+the residual of a PDE loss function, nor is it merely an asymptotic order
+symbol. It is the \emph{actual signed quadrature error} of a given input.
+
+If $Q$ is linear, then $\mathcal R_Q$ is linear on its domain. A generic
+nonlinear neural network approximating $\mathcal R_Q$ is not automatically
+linear.
+
+A trained model
+\[
+    R_{\theta,Q}:\mathbb R^m\longrightarrow\mathbb R
+\]
+can be used when the sensor locations and function family are fixed. More
+generally, it may accept sensor positions, endpoint values, scale, a method
+descriptor, or family-specific features:
+\[
+    R_{\theta,Q}\bigl(S(g),\,\tau,\,h,\,\mathrm{context}\bigr).
+\]
+The fundamental physical-cell prediction is
+\begin{equation}
+    \boxed{
+        \widehat I_i(f)
+        =h_i\left[Q(g_i)+R_{\theta,Q}(S(g_i))\right].
+    }
+    \label{eq:resop-local-prediction}
+\end{equation}
+The full integral and all mesh-node antiderivatives are then obtained by
+ordinary accumulation:
+\begin{align}
+    \widehat I(f)   & =\sum_{i=0}^{N-1}\widehat I_i(f), \\
+    \widehat F(x_0) & =0,\qquad
+    \widehat F(x_k)=\sum_{i=0}^{k-1}\widehat I_i(f)
+    \quad (1\leq k\leq N).
+    \label{eq:resop-prefix}
+\end{align}
+The prefix sum is \emph{not} another learned operator. Estimating values
+between mesh nodes requires a separately specified within-cell reconstruction.
+
+\subsection{Detrending: give the network only the missing curve}
+
+The trapezoid rule integrates every affine function exactly. Let
+\begin{equation}
+    \ell_g(t)=(1-t)g(0)+tg(1),
+    \qquad d_g(t):=g(t)-\ell_g(t).
+    \label{eq:resop-detrend}
+\end{equation}
+Since $\int_0^1\ell_g(t)\,dt=Q_{\mathrm T}(g)$,
+\begin{equation}
+    \boxed{
+        \mathcal R_{\mathrm T}(g)=\int_0^1d_g(t)\,dt,
+        \qquad d_g(0)=d_g(1)=0.
+    }
+    \label{eq:resop-detrended-residual}
+\end{equation}
+Thus the learned task is literally the signed area between the curve and
+its endpoint secant line.
+
+For fixed interior positions, define
+\[
+    z(g):=\bigl(d_g(\tau_1),\ldots,d_g(\tau_m)\bigr)\in\mathbb R^m.
+\]
+A simple exactness-preserving realization is
+\begin{equation}
+    R_{\theta,\mathrm T}(z)=N_\theta(z)-N_\theta(0).
+    \label{eq:resop-zero-constraint}
+\end{equation}
+It gives $R_{\theta,\mathrm T}(0)=0$ exactly, so the corrected formula
+remains exact on affine functions regardless of training. Furthermore,
+adding any affine function to $g$ leaves $z(g)$ unchanged; the baseline
+integrates that added part exactly. This construction does \emph{not}
+guarantee the linearity of $R_\theta$ on general inputs.
+
+\subsection{A minimal schematic}
+
+The intended computation is:
+\[
+    \begin{array}{c}
+        f\ \longrightarrow\ \{[x_i,x_{i+1}]\}_{i=0}^{N-1}
+        \\[2mm]
+        \Big\downarrow\ \text{pull each cell back to }[0,1]
+        \\[2mm]
+        g_i
+        \quad\longrightarrow\quad
+        \begin{cases}
+            \text{endpoints}\longrightarrow Q(g_i), \\
+            \text{interior samples}\longrightarrow
+            R_{\theta,Q}(S(g_i)).
+        \end{cases}
+        \\[2mm]
+        \Big\downarrow\quad h_i\bigl(Q+R_{\theta,Q}\bigr)
+        \\[2mm]
+        \widehat I_i
+        \quad\longrightarrow\quad
+        \text{prefix sums and integral values}.
+    \end{array}
+\]
+The baseline and residual branches share a reference function but have
+distinct jobs. This decomposition is the design principle to preserve in
+all implementations.
+
+\section{What Classical Error Analysis Tells Us}
+\label{sec:resop-regularity}
+
+The notation $O(h^p)$ is a bound on how errors scale, not a computation of
+the actual signed error for a specific cell. ResOpNet attempts to predict
+that signed error from information about a restricted function family.
+Classical error analysis remains useful for choosing the target, its scale,
+and the necessary safeguards.
+
+\subsection{Rectangle rule on a $C^1$ function}
+
+For $f\in C^1([x,x+h])$, let
+\[
+    Q_h^{\mathrm L}(f;x)=hf(x),\qquad
+    \mathcal R_h^{\mathrm L}(f;x)
+    =\int_x^{x+h}f(s)\,ds-hf(x).
+\]
+Integration of $f'$ and interchange of integrals give
+\begin{equation}
+    \mathcal R_h^{\mathrm L}(f;x)
+    =h^2\int_0^1(1-t)f'(x+ht)\,dt.
+    \label{eq:resop-rectangle-error}
+\end{equation}
+Consequently,
+\[
+    \mathcal R_h^{\mathrm L}(f;x)
+    =\frac{h^2}{2}f'(x)+o(h^2)
+\]
+as $h\to0$, with uniformity on a fixed compact domain for fixed $f\in C^1$.
+This suggests learning a suitably normalized local residual rather than
+a target whose magnitude vanishes rapidly with cell width.
+
+\subsection{Trapezoid rule on $C^1$ and $C^2$ functions}
+
+For the physical trapezoid contribution $Q_h^{\mathrm T}$, one obtains,
+for $f\in C^1$,
+\begin{equation}
+    \mathcal R_h^{\mathrm T}(f;x)
+    =h^2\int_0^1\left(\frac12-t\right)f'(x+ht)\,dt.
+    \label{eq:resop-trap-c1}
+\end{equation}
+Writing
+\[
+    \omega_{f'}(h)
+    =\sup_{\substack{s,t\in[a,b]\\|s-t|\leq h}}
+    |f'(s)-f'(t)|
+\]
+gives
+\begin{equation}
+    |\mathcal R_h^{\mathrm T}(f;x)|
+    \leq \frac{h^2}{4}\,\omega_{f'}(h).
+    \label{eq:resop-trap-modulus}
+\end{equation}
+For a fixed continuously differentiable function this is $o(h^2)$
+locally, but the full unbounded class $C^1$ has no common modulus of
+continuity or a universal higher convergence rate.
+
+For $f\in C^2$, the Peano-kernel representation is
+\begin{equation}
+    \mathcal R_h^{\mathrm T}(f;x)
+    =-\frac{h^3}{2}
+    \int_0^1t(1-t)f''(x+ht)\,dt,
+    \label{eq:resop-trap-c2}
+\end{equation}
+and hence
+\begin{equation}
+    |\mathcal R_h^{\mathrm T}(f;x)|
+    \leq\frac{h^3}{12}\|f''\|_{\infty,[x,x+h]}.
+    \label{eq:resop-trap-bound}
+\end{equation}
+For example, $f(x)=x^2$ on $[0,h]$ gives
+\[
+    \int_0^h x^2\,dx-\frac h2\bigl(f(0)+f(h)\bigr)
+    =-\frac{h^3}{6}.
+\]
+The network's target is the number $-h^3/6$, not merely the statement
+that the error is $O(h^3)$.
+
+\subsection{Information limits and honest guarantees}
+
+Suppose a network sees only finitely many point evaluations. Even among
+smooth functions, distinct functions can agree at every observed point
+while having different integrals. Therefore no model, whatever its
+capacity, can recover every integral over unrestricted $C^1$ or $C^2$
+inputs exactly from those samples.
+
+To make the task learnable we must specify a \emph{function family},
+such as a bounded, parameterized family or a distribution of functions.
+Accuracy on that family can be investigated experimentally; a worst-case
+guarantee requires additional regularity and magnitude assumptions.
+Affine normalization alone does not remove this information limit.
+
+\section{Training the Reference-Cell Residual Operator}
+\label{sec:resop-training}
+
+\subsection{Generating supervised targets}
+
+Choose a function family $\mathcal F$ and a distribution of its parameters.
+For a training function $f$ and randomly selected cell $[x,x+h]$, form
+$g(t)=f(x+ht)$. Generate the endpoint and interior observations separately.
+Compute a trusted reference integral $I_{\mathrm{ref}}(g)$, analytically
+when possible or by independently verified high-accuracy quadrature.
+The signed reference target is
+\begin{equation}
+    r_Q(g)=I_{\mathrm{ref}}(g)-Q(g).
+    \label{eq:resop-label}
+\end{equation}
+If a detrended trapezoid architecture is used, feed $z(g)$ from
+\eqref{eq:resop-detrend}; otherwise feed a documented observation vector.
+
+The elementary supervised objective is
+\begin{equation}
+    \boxed{
+        \mathcal L_{\mathrm{res}}(\theta)
+        =\frac1M\sum_{j=1}^{M}
+        \left|R_{\theta,Q}(S(g_j))-r_Q(g_j)\right|^2.
+    }
+    \label{eq:resop-loss}
+\end{equation}
+Equivalently one may minimize
+$|Q(g)+R_{\theta,Q}(S(g))-I_{\mathrm{ref}}(g)|^2$ directly.
+Because $Q$ is a fixed path, the gradient updates the residual network,
+not the known quadrature formula.
+
+For variable physical widths, training on reference-cell residuals keeps
+the explicit Jacobian $h$ outside the network. If family parameters,
+frequencies, or other information vary with $h$, conditioning on that
+context may still be necessary. Scale generalization is an experiment
+to be measured, not assumed.
+
+\subsection{Training splits and contamination control}
+
+Split by \emph{complete generated functions and underlying parameters},
+not by randomly shuffling cells cut from one function. Keep independent
+tests for (i) new functions from the same family, (ii) new ranges of $h$,
+(iii) new parameter regimes, and (iv) new families when transfer is claimed.
+Record seeds, sampling locations, reference tolerances, software versions,
+and the exact model checkpoint.
+
+The cost of expensive reference integration belongs to offline training
+and dataset generation. Deployment comparisons should report both the
+per-query advantage and, when relevant, the number of future queries
+needed to amortize training and data-generation costs.
+
+\subsection{Residual correction versus error certification}
+
+The model predicts $\widehat r$, while the remaining error is
+\[
+    e(g)=\int_0^1g(t)\,dt-Q(g)-\widehat r(g).
+\]
+These are different quantities. An empirical uncertainty score, a second
+model, or agreement between coarse and refined meshes may help identify
+difficult cases, but is not by itself a rigorous error certificate.
+If a tolerance is advertised, specify whether it is a measured statistical
+target or a mathematically certified bound. Unsupported inputs can be
+handled by an explicitly implemented classical fallback.
+
+\section{Operator Models and Replaceable Backbones}
+\label{sec:resop-zoo}
+
+The common object is the \emph{local signed residual operator}, not a
+specific neural-network architecture. The simplest instance is an MLP
+\[
+    R_\theta:\mathbb R^m\to\mathbb R,
+\]
+using detrended interior samples. Possible alternatives are:
+\begin{itemize}
+    \item A compact MLP or convolutional residual corrector on fixed nodes.
+    \item A DeepONet-style model when observations and query coordinates
+          vary, or when a residual \emph{function} rather than one scalar
+          per cell is required.
+    \item An FNO-based model for functions sampled on regular grids and
+          families with exploitable spectral structure. The number of
+          retained modes and frequency range must be tested explicitly.
+    \item Wavelet or multiscale encoders for localized features; specialized
+          phase-aware methods for highly oscillatory families.
+    \item Adaptive samplers that request extra evaluations in the cells
+          where expected gains justify their costs.
+\end{itemize}
+For a scalar target on a handful of nodes, a large operator network may
+be unnecessary. Architecture comparisons should focus on accuracy versus
+\emph{total} cost rather than sophistication.
+
+\subsection{Two distinct modes for the baseline path}
+
+The initial, preferred implementation is
+\begin{equation}
+    \widehat{\mathcal I}=Q_{\mathrm{classical}}+R_\theta.
+    \label{eq:resop-classical-mode}
+\end{equation}
+One may later consider
+\begin{equation}
+    \widehat{\mathcal I}=Q_\phi+R_{\theta,\phi},
+    \label{eq:resop-learned-mode}
+\end{equation}
+where $Q_\phi$ is a separately learned approximation to an expensive
+baseline. In the second mode $R_{\theta,\phi}$ must correct the error of
+$Q_\phi$, \emph{not} merely the error of the original $Q$.
+
+Learning a simple trapezoid weighted sum is unlikely to beat its direct
+evaluation if the same function samples are already available. The
+learned-baseline mode makes sense only if it reduces expensive evaluations
+or substitutes for a genuinely costly operation.
+
+\section{Function Families, Sampling Policies, and Adaptivity}
+\label{sec:resop-families}
+
+Different families may deserve different sensors and encoders while
+sharing the same mathematical contract.
+
+\subsection{First candidate families}
+
+\begin{enumerate}
+    \item \textbf{Smooth functions:}
+          $f(t)=a+bt+ct^2+d\sin(2\pi\omega t+\varphi)$, with explicitly bounded
+          parameter ranges. Use this to debug targets, verify affine exactness,
+          and establish strong classical baselines.
+    \item \textbf{Continuously differentiable but less smooth functions:}
+          $f(t)=a+bt+c|t-\xi|^{3/2}$, $0<\xi<1$, as a simple $C^1$ example
+          whose second derivative is singular at $\xi$. This separates the role
+          of regularity from a purely smooth training set.
+    \item \textbf{Oscillatory families:}
+          $f(t)=A(t)\sin(\omega t+\varphi)$ with a controlled envelope $A$,
+          frequency interval, and phase distribution. Compare local MLP,
+          Fourier-aware, and phase-aware correctors.
+    \item \textbf{Localized features:}
+          narrow smooth bumps or steep transitions, with their width and
+          location recorded. These test adaptive and nonuniform sampling.
+\end{enumerate}
+These are \emph{parameterized subsets} of regularity classes, not all of
+$C^1$ or $C^2$. Fractal or highly irregular families are later research
+subjects and will require their own definitions, information budgets,
+and diagnostics.
+
+\subsection{Nonuniform and adaptive cells}
+
+For variable cell widths the affine rule \eqref{eq:resop-affine} is unchanged.
+A sampling policy may choose internal $\tau_j$ conditional on prior
+observations. Such extra function evaluations are part of the cost.
+
+A useful future system combines (i) a signed correction estimate with
+(ii) a separate prediction or check of the \emph{remaining} corrected
+error. Only the second quantity should guide refinement decisions.
+If it is unreliable, a conservative fallback and independent refined
+quadrature may be preferable. The framework must not claim that a
+large cell is safe simply because its residual network returns a small
+number.
+
+\section{Benchmark Protocol: Can It Beat Classical Quadrature?}
+\label{sec:resop-benchmark}
+
+The main research hypothesis is empirical: after offline learning,
+a reusable local corrector might exploit family-specific information so
+that coarser meshes or fewer expensive evaluations reach an accuracy that
+otherwise needs more work. This should be demonstrated against strong
+existing methods rather than inferred from training loss.
+
+\subsection{Baselines and controlled comparisons}
+
+For each family and budget, compare:
+\begin{enumerate}
+    \item Rectangle, trapezoid, midpoint, Simpson, and suitable
+          Gauss-type rules.
+    \item Adaptive classical integration at the same requested tolerance.
+    \item A direct network that predicts the cell integral without a
+          quadrature shortcut, using matched training data and capacity.
+    \item The proposed $Q+R_\theta$, with and without detrending.
+    \item Alternative residual architectures and sampling policies when
+          their additional complexity is justified.
+\end{enumerate}
+A learned correction may rediscover a familiar higher-order rule.
+For example, on three equally spaced nodes with spacing $h$,
+\[
+    Q_{\mathrm S}-Q_{\mathrm T}
+    =\frac h6(-f_0+2f_1-f_2).
+\]
+Beating trapezoid through this identity alone would not demonstrate
+an advantage over Simpson's formula.
+
+\subsection{Metrics and cost accounting}
+
+Report the final signed error, absolute and relative error (with care
+when the true integral is near zero), high error quantiles, and the error
+distribution on complete unseen functions. Also report:
+\begin{itemize}
+    \item Number of distinct evaluations of $f$, including every
+          internal or adaptively selected sample.
+    \item CPU/GPU inference time, classical accumulation time,
+          memory use, and end-to-end wall-clock time.
+    \item Accuracy at matched function-evaluation budgets, as well as
+          time required to reach a matched \emph{verified} accuracy.
+    \item Error versus cell width and distribution shift, including
+          explicit failure cases.
+    \item Training-data and training-compute costs separately from
+          repeated-query inference.
+\end{itemize}
+Fast inference does not imply fast integration if the extra internal
+samples dominate the runtime. Conversely, a small learned corrector may
+be valuable for expensive functions, repeated queries, or challenging
+special-purpose families.
+
+If the predicted \emph{physical-cell} residual has error
+$|R_i-\widehat R_i|\leq C h_i^{p+1}$ uniformly, then
+\[
+    \left|\sum_i(R_i-\widehat R_i)\right|
+    \leq C\sum_i h_i^{p+1}
+    \leq C(b-a)h_{\max}^{p}
+\]
+for $p>0$. This explains why predicting a signed correction with
+controlled \emph{remaining} error matters. Such a bound requires an
+actual justified hypothesis on the predictor; it cannot be deduced from
+a small training loss alone.
+
+\section{An Open ResOpNet Research Ecosystem}
+\label{sec:resop-ecosystem}
+
+Beyond the first model, the intended project is an open protocol that
+allows researchers to introduce new function families, sampling methods,
+and residual operators without replacing the shared evaluation tools.
+Three components are proposed.
+
+\subsection{Family Registry}
+
+Each family entry specifies its domain, generator or dataset, parameter
+distribution, regularity assumptions, supported scales, reference-value
+method, and train/validation/test splits. A family may be deterministic,
+stochastic, smooth, oscillatory, singular, or domain-specific; the entry
+must identify its actual limits rather than claim universality.
+
+\subsection{Operator Zoo}
+
+Each submission specifies its input observation schema, sampling policy,
+baseline quadrature $Q$, learned correction $R_\theta$, parameter count,
+training recipe, model weights, validity range, and associated paper.
+An MLP, FNO, DeepONet, or non-neural residual approximation can all
+participate if they satisfy the same input-output and evaluation contract.
+Author attribution and model licensing remain attached to each entry.
+
+\subsection{Accuracy and Speed Arena}
+
+A public evaluation harness measures final integral error and full
+computational cost on held-out test functions. Separate leaderboards may
+track smooth, oscillatory, low-regularity, costly-evaluation, and adaptive
+settings. Submission rules should prevent leakage from hidden tests,
+declare hardware and evaluation budgets, and preserve previous benchmark
+versions so reported results remain reproducible.
+
+A minimal software contract could be expressed as:
+\begin{verbatim}
+Family.sample(seed) -> function_spec
+Family.reference(function_spec, interval) -> value
+Sampler.observe(function_spec, cell) -> (positions, values)
+Baseline.integrate(cell, endpoint_or_rule_samples) -> value
+Residual.predict(reference_positions, reference_values,
+                 baseline_context) -> signed_reference_correction
+Benchmark.evaluate(family, sampler, baseline, residual) -> report
+\end{verbatim}
+This is an interface proposal, not an implemented API. It deliberately
+separates the sampling budget from the residual model to make comparisons
+auditable.
+
+Framework releases should be versioned and citable; algorithm-specific
+contributions should receive independent credit. A shared standard is
+valuable only if others can reproduce results and choose not to adopt
+the proposed network without losing access to the benchmark.
+
+\section{First Proof-of-Concept and Milestones}
+\label{sec:resop-prototype}
+
+The first experiment should remain small enough to understand completely.
+It does not require scattering solvers, complex-valued networks, or a
+full research platform.
+
+\subsection{Minimal experiment on $[0,1]$}
+
+\begin{enumerate}
+    \item Implement a family generator with known analytic integrals
+          (initially smooth polynomials and simple trigonometric mixtures).
+    \item Divide each function into physical cells and perform the affine
+          pullback \eqref{eq:resop-affine}.
+    \item Compute the trapezoid baseline from endpoints only; obtain
+          separate interior observations for a small MLP.
+    \item Train on the \emph{signed detrended residual} from
+          \eqref{eq:resop-detrended-residual}, with independent reference
+          values as supervision.
+    \item Produce plots of per-cell signed residuals, corrected integrals,
+          prefix sums, error versus mesh size, and wall time versus
+          achieved error.
+    \item Compare against Simpson, Gauss-type, and adaptive baselines at
+          explicitly matched total sample budgets; document both
+          improvements and failures.
+\end{enumerate}
+
+\subsection{Acceptance criteria}
+
+The initial result is a \emph{reproducible experiment}, not a claim that
+the method beats classical quadrature. It is acceptable when the full
+training and testing pipeline runs deterministically, labels and
+summations are checked against analytic cases, sampling costs are
+reported, and failures are visible.
+
+A stronger subsequent claim requires consistent gains on held-out
+instances at matched accuracy, including inference and function
+evaluation costs. Only after that should the project expand to
+more families, FNO/DeepONet alternatives, adaptive meshes, a model
+registry, and an external challenge.
+
+\section{Relation to Acoustic Scattering and Future Questions}
+\label{sec:resop-outlook}
+
+Numerical integration is the starting point because its classical
+baseline and its local signed residual are directly observable with
+trusted references. In a later stage, structured residual learning may
+be useful in boundary integral equations for scattering, where kernel
+oscillation, geometric features, and near-singular quadrature can make
+individual evaluations expensive. Singular terms must be treated
+explicitly; a corrector trained on smooth reference-cell functions is
+not automatically transferable to a singular Helmholtz kernel.
+
+The larger research questions are:
+\begin{itemize}
+    \item Which families admit accurate local correction from a fixed
+          sampling budget, and which do not?
+    \item Which sampling policies and operator backbones provide the
+          best accuracy--time tradeoff for each family?
+    \item How much can one model generalize over affine cell widths and
+          outside its parameter distribution?
+    \item Can the corrected result be accompanied by a reliable
+          error estimate or a rigorous certification procedure?
+    \item Does a common registry and benchmark lead to reusable methods
+          beyond the first proof-of-concept?
+\end{itemize}
+
+\paragraph{Status.}
+This chapter specifies the ResOpNet idea, its mathematical targets, and
+its proposed experimental and community infrastructure. No speedup,
+accuracy improvement, universal function-class guarantee, or benchmark
+result is asserted prior to numerical validation.
+
+
+
+
+\section{Reference}
+\bibliographystyle{plain}  % or another style like unsrt, IEEEtran, etc.
+\bibliography{refer}  % references.bib is the file name
