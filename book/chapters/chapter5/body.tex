@@ -1,0 +1,170 @@
+% SCHO research specification; experimental validation is pending.
+% This is a pure LaTeX chapter without a document preamble.
+
+\section{Motivation: Function Coordinates Instead of Fixed Sensors}
+\label{sec:scho-motivation}
+
+We propose \emph{Spline-Coefficient HyperOperator} (SCHO): represent both
+the input and output in fixed finite-dimensional spline spaces, then
+learn an operator between the coefficient vectors. This is different
+from a fixed point-sampling encoder followed by a query-coordinate
+decoder. It is a finite-dimensional model, not a representation of
+all functions in an infinite-dimensional space.
+
+Fix domains $X,Y$ and linearly independent B-spline families
+$\{B_i\}_{i=1}^{m}$ on $X$ and $\{\Phi_j\}_{j=1}^{n}$ on $Y$.
+The knot vectors, degrees, boundaries, and basis order must be specified
+before training. Define
+\begin{equation}
+ V_m=\operatorname{span}\{B_1,\ldots,B_m\},\quad
+ U_n=\operatorname{span}\{\Phi_1,\ldots,\Phi_n\}.
+ \label{eq:scho-spaces}
+\end{equation}
+For the input function and learned output, set
+\begin{equation}
+ f_\theta(x)=\sum_{i=1}^{m}\theta_i B_i(x),\quad
+ \beta=H_\alpha(\theta),\quad
+ u_\beta(y)=\sum_{j=1}^{n}\beta_j\Phi_j(y).
+ \label{eq:scho-base}
+\end{equation}
+The hypernetwork $H_\alpha:\mathbb R^m\to\mathbb R^n$ can be a small
+ordinary MLP. The output is a whole spline function; its value at
+any query coordinate is obtained through the fixed basis evaluation.
+Only the use of B-spline expansion is borrowed from one component of
+Kolmogorov--Arnold Networks (KANs), not the full KAN architecture.
+
+\section{Coordinate Uniqueness and Its Limits}
+\label{sec:scho-uniqueness}
+
+For fixed, linearly independent bases,
+\begin{equation}
+ f_{\theta_1}=f_{\theta_2}\iff\theta_1=\theta_2,\qquad
+ u_{\beta_1}=u_{\beta_2}\iff\beta_1=\beta_2.
+ \label{eq:scho-unique}
+\end{equation}
+This is uniqueness of \emph{coordinates in the selected spline spaces}.
+Representing arbitrary functions outside those spaces requires a
+specified projection, interpolation, or fitting procedure, with its own
+approximation and conditioning errors. These statements do not imply
+uniqueness of the neural network weights $\alpha$ or PDE solutions.
+
+In a simple integration example, when the output basis spans the exact
+antiderivatives of the input basis,
+\begin{equation}
+ \mathcal I f_\theta(x)=\int_0^x f_\theta(t)\,dt
+   =\sum_{j=1}^{n}(A\theta)_j\Phi_j(x).
+ \label{eq:scho-integral}
+\end{equation}
+The exact coefficient map $A$ is then a fixed matrix, so learning it is
+a useful \emph{correctness check}, not evidence that a hypernetwork
+accelerates integration.
+
+\section{SCHO-Res: A Restricted Correction Space}
+\label{sec:scho-res}
+
+To enrich the main spline space, choose an ambient output Hilbert space
+$V\supset U_n$ with a documented inner product and let
+$P_n:V\to U_n$ be its orthogonal projection. For chosen candidate
+functions $\widetilde\psi_k\in V$, define
+\begin{equation}
+ \psi_k=(I-P_n)\widetilde\psi_k.
+ \label{eq:scho-projection}
+\end{equation}
+Discard zero or dependent projected features. With
+$W_r=\operatorname{span}\{\psi_1,\ldots,\psi_r\}$,
+we have $W_r\subset U_n^\perp$ and $U_n\cap W_r=\{0\}$.
+A small Dense network produces correction coefficients
+$D_\varphi:\mathbb R^m\to\mathbb R^r$:
+\begin{equation}
+ \boxed{
+ \begin{aligned}
+ \mathcal H_{\alpha,\varphi}:\theta
+   &\longmapsto\bigl(H_\alpha(\theta),D_\varphi(\theta)\bigr)
+    =(\beta,\gamma),\\
+ \widehat u_\theta(y)
+   &=\sum_j\beta_j\Phi_j(y)+\sum_k\gamma_k\psi_k(y).
+ \end{aligned}}
+ \label{eq:scho-res-operator}
+\end{equation}
+Because the two bases together are linearly independent, the output
+function has a unique $(\beta,\gamma)$ representation. This does not
+fix the internal neural-network weight symmetries.
+
+Alternatively a Dense neural field $N_\varphi(\theta,\cdot)$ can be
+projected as $(I-P_n)N_\varphi(\theta,\cdot)$. This guarantees only
+function-level complementarity, not unique network parameters.
+The fixed correction-basis version is the first experiment.
+
+For homogeneous Dirichlet data, use trial and correction functions in
+$H_0^1(0,1)$, where the energy inner product
+$a(v,w)=\int_0^1v'w'\,dx$ is valid. The corresponding projection is
+computed via a fixed Gram matrix. For inhomogeneous boundary data,
+a boundary lift is required. Exact function-space orthogonality can
+also be affected by numerical projection and quadrature errors.
+
+\section{PDE-Based Learning without Solution Labels}
+\label{sec:scho-physics}
+
+Consider a family of Dirichlet Poisson problems:
+\begin{equation}
+ -u''(x)=f_\theta(x)\ \ (0<x<1),\qquad u(0)=u(1)=0.
+ \label{eq:scho-poisson}
+\end{equation}
+Its weak form is
+\begin{equation}
+ \int_0^1u'(x)v'(x)\,dx=\int_0^1 f_\theta(x)v(x)\,dx
+ \quad\text{for all }v\in H_0^1(0,1).
+ \label{eq:scho-weak}
+\end{equation}
+Choose a finite set of test functions $v_1,\ldots,v_L$ and a
+distribution of input coefficients $\theta$. Define a physics-informed
+loss using the predicted spline plus correction:
+\begin{equation}
+ \boxed{\mathcal L(\alpha,\varphi)=
+  \mathbb E_\theta\sum_{\ell=1}^{L}
+  \left|\int_0^1\widehat u_\theta'v_\ell'\,dx
+        -\int_0^1f_\theta v_\ell\,dx\right|^2.}
+ \label{eq:scho-weak-loss}
+\end{equation}
+It uses \emph{no reference solution values}, but it still requires
+the PDE, boundary conditions, forcing samples or coefficients,
+test functions, and numerical integration. A low loss over finite
+test functions does not certify continuum solution accuracy.
+
+\subsection{Differentiating through the operator}
+
+Writing $\Phi=(\Phi_1,\ldots,\Phi_n)^\mathsf T$ and
+$\Psi=(\psi_1,\ldots,\psi_r)^\mathsf T$, the sensitivity to input
+coefficients is
+\begin{equation}
+ \frac{\partial\widehat u_\theta(x)}{\partial\theta}
+ =\Phi(x)^\mathsf T J_{H_\alpha}(\theta)
+ +\Psi(x)^\mathsf T J_{D_\varphi}(\theta).
+ \label{eq:scho-jacobian}
+\end{equation}
+Automatic differentiation can backpropagate the weak-form loss through
+both networks, while spatial derivatives of fixed B-splines can be
+evaluated analytically. Quadrature and projection operations must
+preserve the required differentiation paths.
+
+\section{Initial Demonstrations and Comparisons}
+\label{sec:scho-roadmap}
+
+\begin{enumerate}
+ \item Implement a fixed-knot B-spline basis, its derivatives and
+ Dirichlet constraints; test coordinate reconstruction and basis rank.
+ \item Verify the integral example against the exact matrix $A$.
+ \item Train SCHO-Base on the Poisson family using the weak-form loss;
+ independently check errors against a numerical spline/Galerkin solver.
+ \item Add a few orthogonally projected correction modes, first with
+ $H_\alpha$ frozen, then optionally with joint training.
+ Compare against simply enlarging the ordinary spline space.
+ \item Study a nonlinear coefficient map using, for instance,
+ $-u''+u^3=f_\theta$ with homogeneous Dirichlet conditions.
+\end{enumerate}
+Compare final solution error, distribution shifts, total compute and
+memory, training cost and inference latency. A strong classical
+discretization is a required baseline: for linear Poisson equations
+the discrete coefficient map is itself linear. No improvement,
+theorem of universal approximation, or numerical result is claimed
+at this specification stage.

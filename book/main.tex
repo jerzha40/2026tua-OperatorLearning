@@ -1,28 +1,16 @@
-% \documentclass[12pt, a4paper]{book}
+% Joint manuscript entry: compile from book/
 \documentclass{book}
-
-% Load all shared packages from our single preamble file
 \input{preamble}
-
-\title{TMP}
-\author{TMP}
-\date{20260814-\today}
-
+\title{Operator Learning Research Notes}
+\author{Jinrui Zhang}
+\date{\today}
 \begin{document}
-
-\maketitle          % renders the book title page
-\tableofcontents    % renders the book-wide table of contents
-
-% Chapter 1: we provide the \chapter heading here,
-% then pull in the shared content (sections and text).
-\chapter{Residual Operator Network}
+\maketitle
+\tableofcontents
+% Existing public ResOpNet chapter (directory numbering reflects source history).
+\chapter{Residual Operator Network (ResOpNet)}
 \input{chapters/chapter4/body.tex}
-
-% When you have more chapters, add them the same way:
-% \chapter{Tensor Notation of Mine}
-% \input{chapters/chapter2/body.tex}
-
-% \chapter{DeepONet Direct Scatter}
-% \input{chapters/chapter3/body.tex}
-
+% New SCHO research specification.
+\chapter{Spline-Coefficient HyperOperator (SCHO)}
+\input{chapters/chapter5/body.tex}
 \end{document}
