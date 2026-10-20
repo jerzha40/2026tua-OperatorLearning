@@ -114,6 +114,210 @@ also be affected by numerical projection and quadrature errors.
 
 
 
+
+\subsection{A worked example: degree-one splines and exact integration}
+\label{sec:scho-concrete-integration}
+
+Start with any partition of $[0,1]$:
+\begin{equation}
+  0=x_0<x_1<\cdots<x_N=1,\qquad h_i=x_{i+1}-x_i.
+\end{equation}
+Degree-one clamped B-splines $B_i$ are exactly the nodal
+piecewise-linear hat functions used in one-dimensional $P_1$
+finite elements. Their knot vector is
+$(x_0,x_0,x_1,\ldots,x_{N-1},x_N,x_N)$ and
+\begin{equation}
+  f_h(x)=\sum_{i=0}^{N}\theta_i B_i(x),
+  \qquad \theta_i=f_h(x_i).
+\end{equation}
+The exact antiderivative $U_h(x)=\int_0^x f_h(s)\,ds$
+belongs to the quadratic spline space obtained by adding
+one copy of each endpoint knot. Write
+\begin{equation}
+  U_h(x)=\sum_{j=0}^{N+1}\beta_j\Phi_j(x),
+  \qquad \beta=A_h\theta.
+\end{equation}
+Define weights (valid also for nonuniform cells)
+\begin{equation}
+  w_i=\begin{cases}
+    h_0/2,&i=0,\\
+    (h_{i-1}+h_i)/2,&1\leq i<N,\\
+    h_{N-1}/2,&i=N.
+  \end{cases}
+\end{equation}
+Then integration gives the exact coefficient transformation
+\begin{equation}
+  \boxed{
+  \beta_0=0,\quad
+  \beta_j=\sum_{i=0}^{j-1}w_i\theta_i,\quad
+  (A_h)_{ji}=\begin{cases}w_i,&i<j,\\0,&i\geq j.\end{cases}}
+  \label{eq:scho-weighted-prefix}
+\end{equation}
+Here $0\leq i\leq N$ and $0\leq j\leq N+1$.
+Although $A_h$ has a lower-triangular pattern, we need not
+construct a dense matrix: a weighted cumulative sum computes
+the coefficients in $O(N)$ operations, without training.
+
+For two interior knots $(x_1,x_2)=(1/3,2/3)$:
+\begin{equation}
+  A_h=
+  \begin{pmatrix}
+   0&0&0&0\\
+   \frac16&0&0&0\\
+   \frac16&\frac13&0&0\\
+   \frac16&\frac13&\frac13&0\\
+   \frac16&\frac13&\frac13&\frac16
+  \end{pmatrix},\qquad
+  A_h\begin{pmatrix}0\\3\\0\\0\end{pmatrix}
+   =\begin{pmatrix}0\\0\\1\\1\\1\end{pmatrix}.
+  \label{eq:scho-prefix-example}
+\end{equation}
+The five output numbers are \emph{quadratic spline
+coefficients}, not nodal samples. This reconstructs the
+antiderivative exactly; its value at $x=1$ is $1$.
+
+\subsubsection{What about the tridiagonal Poisson matrix?}
+
+For the Dirichlet problem $-u''=f$ on $[0,1]$, the
+same degree-one hats $\phi_1,\ldots,\phi_{N-1}$ yield
+the Galerkin stiffness matrix
+\begin{equation}
+  K_{ij}=\int_0^1\phi_i'\phi_j'\,dx,\qquad
+  K_{ii}=\frac1{h_{i-1}}+\frac1{h_i},\qquad
+  K_{i,i+1}=-\frac1{h_i},
+  \label{eq:scho-p1-stiffness}
+\end{equation}
+with $K_{ij}=0$ when $|i-j|>1$, and symmetric
+off-diagonal entries. Hence $K$ is tridiagonal and
+$Kc=b$ can be solved in $O(N)$ time. The stiffness
+matrix $K$ is \emph{not} the integration map $A_h$:
+they serve different purposes. Higher-degree B-splines
+keep local support but produce wider bands; they need
+not be computationally preferable when linear hats
+already achieve the desired accuracy.
+
+
+\subsection{An interpolation defect and a learned integral correction}
+\label{sec:scho-interpolation-defect}
+
+The earlier orthogonal SCHO-Res decomposition concerns
+the \emph{output} space. For numerical integration
+there is another useful, but non-orthogonal, decomposition
+of the \emph{input}. Given an unknown continuous $f$,
+let $P_hf$ be its nodal piecewise-linear interpolant:
+\begin{equation}
+  \boxed{f=P_hf+\varepsilon_f,\quad
+  \varepsilon_f=f-P_hf,\quad \varepsilon_f(x_i)=0.}
+\end{equation}
+The fixed interpolation operator makes this split unique.
+It is not an orthogonal projection. By linearity,
+\begin{equation}
+  \boxed{
+  \int_0^x f(s)\,ds=
+  \underbrace{\Phi(x)^{\mathsf T}A_h\theta}_{\text{exact base}}
+  +\underbrace{\int_0^x\varepsilon_f(s)\,ds}_{\text{unknown residual}},
+  \qquad\theta_i=f(x_i).
+  }
+  \label{eq:scho-split-integral}
+\end{equation}
+The node values alone do \emph{not} determine the residual
+integral for an arbitrary continuous $f$.
+
+\subsubsection{Local reference-cell representation}
+
+For a cell $[x_i,x_{i+1}]$, set
+\begin{equation}
+  t=(x-x_i)/h_i,\quad g_i(t)=f(x_i+h_it),\quad
+  \ell_i(t)=(1-t)\theta_i+t\theta_{i+1}.
+\end{equation}
+The local defect is $e_i(t)=g_i(t)-\ell_i(t)$.
+Instead of learning $e_i$ and integrating a network at
+inference, learn its \emph{accumulated} correction:
+\begin{equation}
+  E_i(t)=\int_0^t e_i(s)\,ds,\qquad
+  \boxed{E_i(0)=0,\quad E_i'(t)=e_i(t).}
+  \label{eq:scho-defect-ode}
+\end{equation}
+Since $e_i(0)=e_i(1)=0$, its primitive has
+$E_i'(0)=E_i'(1)=0$. Importantly, $E_i(1)$
+may be nonzero: it is the signed cell integral error.
+
+An example with just two fixed correction modes is
+\begin{equation}
+  \psi_0(t)=3t^2-2t^3,\qquad
+  \psi_1(t)=t^2(1-t)^2.
+\end{equation}
+Both vanish at $t=0$ and have zero derivative at
+the two endpoints, but $\psi_0(1)=1$.
+Given observed cell data, for example
+\begin{equation}
+  y_i=\bigl(g_i(0),g_i(\tfrac12),g_i(1),h_i\bigr),
+\end{equation}
+let a small hypernetwork output correction coefficients:
+\begin{equation}
+  \boxed{\gamma_i=H_\alpha(y_i),\qquad
+  \widehat E_i(t)=\sum_{k=0}^{r-1}\gamma_{i,k}\psi_k(t)
+             =\Psi(t)^{\mathsf T}H_\alpha(y_i).}
+  \label{eq:scho-cell-hypernetwork}
+\end{equation}
+This is an operator from a finite sensor vector to
+a whole local correction function.
+
+\subsubsection{Derivative loss and gradient through the network}
+
+During training, evaluate the true $g_i(t)$ at additional
+collocation points. No exact \emph{integral labels} are
+needed to enforce the differential definition:
+\begin{equation}
+  \boxed{\mathcal L(\alpha)=\mathbb E_{i,t}
+  \left|\Psi'(t)^{\mathsf T}H_\alpha(y_i)
+            -[g_i(t)-\ell_i(t)]\right|^2.}
+  \label{eq:scho-defect-loss}
+\end{equation}
+The network need not differentiate through spline knots
+to get the spatial derivative: the fixed $\psi_k'(t)$
+are known analytically. Automatic differentiation
+does backpropagate through the \emph{coefficient map}.
+For the scalar error
+$\rho=\Psi'(t)^{\mathsf T}H_\alpha(y_i)-e_i(t)$,
+\begin{equation}
+  \boxed{\nabla_\alpha(\rho^2)=2\rho\,
+  J_{H_\alpha,\alpha}(y_i)^{\mathsf T}\Psi'(t).}
+  \label{eq:scho-defect-backprop}
+\end{equation}
+Thus the path is: loss, correction coefficients,
+hypernetwork weights. Here the Jacobian is
+$r\times\dim(\alpha)$. Finite sensors do not make an
+arbitrary input function identifiable; the training
+collocation values supply extra information.
+
+For $x=x_j+h_jt$ the global prediction becomes
+\begin{equation}
+  \boxed{\widehat U(x)=\Phi(x)^{\mathsf T}A_h\theta
+  +\sum_{i<j}h_i\widehat E_i(1)+h_j\widehat E_j(t).}
+  \label{eq:scho-defect-global}
+\end{equation}
+The factor $h_i$ comes from the affine substitution.
+No numerical integration of the network is needed
+during inference.
+
+\paragraph{A crucial non-neural baseline.}
+If $e_i(t)=c_i\,t(1-t)$ and $z_i=g_i(1/2)$, then
+$c_i=4[z_i-(\theta_i+\theta_{i+1})/2]$ and
+$E_i(t)=(c_i/6)\psi_0(t)$ exactly. Therefore
+\begin{equation}
+  \int_{x_i}^{x_{i+1}}f(x)\,dx
+  =\frac{h_i}{6}(\theta_i+4z_i+\theta_{i+1}),
+  \label{eq:scho-simpson}
+\end{equation}
+which is precisely \emph{Simpson's rule}. This family
+does not justify a neural network: with three sensors,
+the classical rule is already exact. For other function
+families, the speed, extra sampling cost, accuracy and
+failure cases must be benchmarked against classical
+quadrature. These are proposed training equations,
+not experimental results.
+
 \section{PDE-Based Learning without Solution Labels}
 \label{sec:scho-physics}
 
