@@ -140,17 +140,17 @@ one copy of each endpoint knot. Write
 Define weights (valid also for nonuniform cells)
 \begin{equation}
   w_i=\begin{cases}
-    h_0/2,&i=0,\\
-    (h_{i-1}+h_i)/2,&1\leq i<N,\\
-    h_{N-1}/2,&i=N.
+    h_0/2,           & i=0,       \\
+    (h_{i-1}+h_i)/2, & 1\leq i<N, \\
+    h_{N-1}/2,       & i=N.
   \end{cases}
 \end{equation}
 Then integration gives the exact coefficient transformation
 \begin{equation}
   \boxed{
-  \beta_0=0,\quad
-  \beta_j=\sum_{i=0}^{j-1}w_i\theta_i,\quad
-  (A_h)_{ji}=\begin{cases}w_i,&i<j,\\0,&i\geq j.\end{cases}}
+    \beta_0=0,\quad
+    \beta_j=\sum_{i=0}^{j-1}w_i\theta_i,\quad
+    (A_h)_{ji}=\begin{cases}w_i,&i<j,\\0,&i\geq j.\end{cases}}
   \label{eq:scho-weighted-prefix}
 \end{equation}
 Here $0\leq i\leq N$ and $0\leq j\leq N+1$.
@@ -162,18 +162,18 @@ For two interior knots $(x_1,x_2)=(1/3,2/3)$:
 \begin{equation}
   A_h=
   \begin{pmatrix}
-   0&0&0&0\\
-   \frac16&0&0&0\\
-   \frac16&\frac13&0&0\\
-   \frac16&\frac13&\frac13&0\\
-   \frac16&\frac13&\frac13&\frac16
+    0       & 0       & 0       & 0       \\
+    \frac16 & 0       & 0       & 0       \\
+    \frac16 & \frac13 & 0       & 0       \\
+    \frac16 & \frac13 & \frac13 & 0       \\
+    \frac16 & \frac13 & \frac13 & \frac16
   \end{pmatrix},\qquad
   A_h\begin{pmatrix}0\\3\\0\\0\end{pmatrix}
-   =\begin{pmatrix}0\\0\\1\\1\\1\end{pmatrix}.
+  =\begin{pmatrix}0\\0\\1\\1\\1\end{pmatrix}.
   \label{eq:scho-prefix-example}
 \end{equation}
 The five output numbers are \emph{quadratic spline
-coefficients}, not nodal samples. This reconstructs the
+  coefficients}, not nodal samples. This reconstructs the
 antiderivative exactly; its value at $x=1$ is $1$.
 
 \subsubsection{What about the tridiagonal Poisson matrix?}
@@ -207,16 +207,16 @@ of the \emph{input}. Given an unknown continuous $f$,
 let $P_hf$ be its nodal piecewise-linear interpolant:
 \begin{equation}
   \boxed{f=P_hf+\varepsilon_f,\quad
-  \varepsilon_f=f-P_hf,\quad \varepsilon_f(x_i)=0.}
+    \varepsilon_f=f-P_hf,\quad \varepsilon_f(x_i)=0.}
 \end{equation}
 The fixed interpolation operator makes this split unique.
 It is not an orthogonal projection. By linearity,
 \begin{equation}
   \boxed{
-  \int_0^x f(s)\,ds=
-  \underbrace{\Phi(x)^{\mathsf T}A_h\theta}_{\text{exact base}}
-  +\underbrace{\int_0^x\varepsilon_f(s)\,ds}_{\text{unknown residual}},
-  \qquad\theta_i=f(x_i).
+    \int_0^x f(s)\,ds=
+    \underbrace{\Phi(x)^{\mathsf T}A_h\theta}_{\text{exact base}}
+    +\underbrace{\int_0^x\varepsilon_f(s)\,ds}_{\text{unknown residual}},
+    \qquad\theta_i=f(x_i).
   }
   \label{eq:scho-split-integral}
 \end{equation}
@@ -256,8 +256,8 @@ Given observed cell data, for example
 let a small hypernetwork output correction coefficients:
 \begin{equation}
   \boxed{\gamma_i=H_\alpha(y_i),\qquad
-  \widehat E_i(t)=\sum_{k=0}^{r-1}\gamma_{i,k}\psi_k(t)
-             =\Psi(t)^{\mathsf T}H_\alpha(y_i).}
+    \widehat E_i(t)=\sum_{k=0}^{r-1}\gamma_{i,k}\psi_k(t)
+    =\Psi(t)^{\mathsf T}H_\alpha(y_i).}
   \label{eq:scho-cell-hypernetwork}
 \end{equation}
 This is an operator from a finite sensor vector to
@@ -271,7 +271,7 @@ needed to enforce the differential definition:
 \begin{equation}
   \boxed{\mathcal L(\alpha)=\mathbb E_{i,t}
   \left|\Psi'(t)^{\mathsf T}H_\alpha(y_i)
-            -[g_i(t)-\ell_i(t)]\right|^2.}
+  -[g_i(t)-\ell_i(t)]\right|^2.}
   \label{eq:scho-defect-loss}
 \end{equation}
 The network need not differentiate through spline knots
@@ -282,7 +282,7 @@ For the scalar error
 $\rho=\Psi'(t)^{\mathsf T}H_\alpha(y_i)-e_i(t)$,
 \begin{equation}
   \boxed{\nabla_\alpha(\rho^2)=2\rho\,
-  J_{H_\alpha,\alpha}(y_i)^{\mathsf T}\Psi'(t).}
+    J_{H_\alpha,\alpha}(y_i)^{\mathsf T}\Psi'(t).}
   \label{eq:scho-defect-backprop}
 \end{equation}
 Thus the path is: loss, correction coefficients,
@@ -294,7 +294,7 @@ collocation values supply extra information.
 For $x=x_j+h_jt$ the global prediction becomes
 \begin{equation}
   \boxed{\widehat U(x)=\Phi(x)^{\mathsf T}A_h\theta
-  +\sum_{i<j}h_i\widehat E_i(1)+h_j\widehat E_j(t).}
+    +\sum_{i<j}h_i\widehat E_i(1)+h_j\widehat E_j(t).}
   \label{eq:scho-defect-global}
 \end{equation}
 The factor $h_i$ comes from the affine substitution.
@@ -317,6 +317,9 @@ families, the speed, extra sampling cost, accuracy and
 failure cases must be benchmarked against classical
 quadrature. These are proposed training equations,
 not experimental results.
+
+
+
 
 \section{PDE-Based Learning without Solution Labels}
 \label{sec:scho-physics}
